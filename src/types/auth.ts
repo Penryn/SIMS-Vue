@@ -14,7 +14,6 @@ export type UserRole =
 export interface LoginForm {
   username: string
   password: string
-  captcha?: string
 }
 
 // 用户信息

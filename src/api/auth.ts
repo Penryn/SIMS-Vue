@@ -34,11 +34,3 @@ export const changePassword = (data: ChangePasswordForm) => {
     data
   })
 }
-
-// 获取验证码
-export const getCaptcha = () => {
-  return request({
-    url: '/auth/captcha',
-    method: 'get'
-  })
-}

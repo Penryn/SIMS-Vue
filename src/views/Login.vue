@@ -57,27 +57,6 @@
             </el-input>
           </el-form-item>
 
-          <!-- 验证码 -->
-          <el-form-item prop="captcha" v-if="showCaptcha">
-            <div class="captcha-wrapper">
-              <el-input
-                v-model="loginForm.captcha"
-                placeholder="请输入验证码"
-                size="large"
-                :disabled="authStore.isLocked"
-                autocomplete="off"
-              >
-                <template #prefix>
-                  <el-icon><Picture /></el-icon>
-                </template>
-              </el-input>
-              <div class="captcha-image" @click="refreshCaptcha">
-                <img :src="captchaUrl" alt="验证码" />
-                <div class="refresh-tip">点击刷新</div>
-              </div>
-            </div>
-          </el-form-item>
-
           <el-form-item>
             <el-button
               type="primary"
@@ -118,21 +97,17 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
-import { getCaptcha } from '@/api/auth'
 import type { LoginForm } from '@/types/auth'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
-const showCaptcha = ref(false)
-const captchaUrl = ref('')
 let lockTimer: NodeJS.Timeout | null = null
 
 const loginForm = ref<LoginForm>({
   username: '',
-  password: '',
-  captcha: ''
+  password: ''
 })
 
 // 表单验证规则
@@ -144,9 +119,6 @@ const rules = {
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, message: '密码长度至少6位', trigger: 'blur' }
-  ],
-  captcha: [
-    { required: showCaptcha.value, message: '请输入验证码', trigger: 'blur' }
   ]
 }
 
@@ -173,25 +145,10 @@ const handleLogin = async () => {
   } catch (error: any) {
     ElMessage.error(error.message || '登录失败')
     
-    // 登录失败后显示验证码
-    showCaptcha.value = true
-    await refreshCaptcha()
-    
-    // 清空密码和验证码
+    // 清空密码
     loginForm.value.password = ''
-    loginForm.value.captcha = ''
   } finally {
     loading.value = false
-  }
-}
-
-// 刷新验证码
-const refreshCaptcha = async () => {
-  try {
-    const response = await getCaptcha()
-    captchaUrl.value = response.data.captchaUrl
-  } catch (error) {
-    console.error('获取验证码失败:', error)
   }
 }
 
@@ -220,12 +177,6 @@ onMounted(() => {
   
   // 启动锁定倒计时
   startLockTimer()
-  
-  // 如果有登录失败记录，显示验证码
-  if (authStore.loginFailCount > 0) {
-    showCaptcha.value = true
-    refreshCaptcha()
-  }
 })
 
 onUnmounted(() => {
@@ -297,49 +248,6 @@ onUnmounted(() => {
   margin-bottom: 24px;
 }
 
-.captcha-wrapper {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.captcha-wrapper .el-input {
-  flex: 1;
-}
-
-.captcha-image {
-  width: 100px;
-  height: 40px;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-}
-
-.captcha-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.refresh-tip {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
-  font-size: 10px;
-  text-align: center;
-  padding: 2px;
-  transform: translateY(100%);
-  transition: transform 0.3s;
-}
-
-.captcha-image:hover .refresh-tip {
-  transform: translateY(0);
-}
 
 .login-btn {
   width: 100%;
