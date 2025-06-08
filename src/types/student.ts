@@ -7,6 +7,47 @@ export type Gender = 'male' | 'female'
 // 学籍状态
 export type StudentStatus = 'active' | 'graduated' | 'suspended' | 'expelled'
 
+// 完整的学生档案信息（匹配后端 StudentProfile 实体）
+export interface StudentProfile {
+  id: number
+  studentId: string
+  name: string
+  gender: Gender
+  idNumber: string
+  college: {
+    id: number
+    name: string
+    code?: string
+  }
+  major: {
+    id: number
+    name: string
+    code?: string
+    collegeId: number
+  }
+  degreeType: DegreeType
+  supervisor: {
+    id: number
+    name: string
+    email?: string
+    phone?: string
+  }
+  enrollmentDate: string
+  expectedGraduationDate?: string
+  currentStatus: StudentStatus
+  address?: string
+  emergencyContact?: string
+  emergencyPhone?: string
+  researchDirection?: string
+  user?: {
+    id: number
+    email?: string
+    phone?: string
+  }
+  createdAt: string
+  updatedAt: string
+}
+
 // 学生基础信息
 export interface StudentInfo {
   id: string
@@ -118,4 +159,15 @@ export interface PageResponse<T> {
   total: number
   page: number
   pageSize: number
+}
+
+// 学生更新表单
+export interface StudentUpdateForm {
+  email?: string
+  phone?: string
+  address?: string
+  emergencyContact?: string
+  emergencyPhone?: string
+  expectedGraduationDate?: string
+  researchDirection?: string
 }

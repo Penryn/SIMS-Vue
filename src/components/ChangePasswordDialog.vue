@@ -5,7 +5,7 @@
     :close-on-click-modal="!forceChange"
     :close-on-press-escape="!forceChange"
     :show-close="!forceChange"
-    width="450px"
+    width="550px"
   >
     <el-form
       ref="formRef"
@@ -32,16 +32,12 @@
           placeholder="请输入新密码"
           autocomplete="new-password"
         />
-        <div class="password-tips">
-          <p>密码要求：</p>
-          <ul>
-            <li :class="{ valid: hasMinLength }">至少8位字符</li>
-            <li :class="{ valid: hasNumber }">包含数字</li>
-            <li :class="{ valid: hasLowercase }">包含小写字母</li>
-            <li :class="{ valid: hasUppercase }">包含大写字母</li>
-            <li :class="{ valid: hasSpecialChar }">包含特殊字符</li>
-          </ul>
-        </div>
+        <PasswordStrength 
+          :password="form.newPassword"
+          :show-generator="true"
+          @password-generated="handlePasswordGenerated"
+          @validation-change="handleValidationChange"
+        />
       </el-form-item>
       
       <el-form-item label="确认密码" prop="confirmPassword">
@@ -71,7 +67,8 @@ import { ref, computed, watch } from 'vue'
 import { ElMessage, type FormInstance } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { changePassword } from '@/api/auth'
-import { validatePassword } from '@/utils/password'
+import { validatePassword, type PasswordValidationResult } from '@/utils/password'
+import PasswordStrength from './PasswordStrength.vue'
 import type { ChangePasswordForm } from '@/types/auth'
 
 interface Props {
@@ -92,6 +89,7 @@ const emit = defineEmits<Emits>()
 const authStore = useAuthStore()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
+const passwordValidation = ref<PasswordValidationResult | null>(null)
 
 const form = ref<ChangePasswordForm>({
   oldPassword: '',
@@ -104,13 +102,6 @@ const dialogVisible = computed({
   set: (value) => emit('update:modelValue', value)
 })
 
-// 密码强度检查
-const hasMinLength = computed(() => form.value.newPassword.length >= 8)
-const hasNumber = computed(() => /\d/.test(form.value.newPassword))
-const hasLowercase = computed(() => /[a-z]/.test(form.value.newPassword))
-const hasUppercase = computed(() => /[A-Z]/.test(form.value.newPassword))
-const hasSpecialChar = computed(() => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.value.newPassword))
-
 // 表单验证规则
 const rules = {
   oldPassword: [
@@ -120,12 +111,17 @@ const rules = {
     { required: true, message: '请输入新密码', trigger: 'blur' },
     {
       validator: (_rule: any, value: string, callback: Function) => {
-        const validation = validatePassword(value)
-        if (!validation.valid) {
-          callback(new Error(validation.message))
-        } else {
-          callback()
+        if (!value) {
+          callback(new Error('请输入新密码'))
+          return
         }
+        
+        if (!passwordValidation.value?.valid) {
+          callback(new Error('密码不符合复杂度要求'))
+          return
+        }
+        
+        callback()
       },
       trigger: 'blur'
     }
@@ -143,6 +139,17 @@ const rules = {
       trigger: 'blur'
     }
   ]
+}
+
+// 处理密码生成
+const handlePasswordGenerated = (password: string) => {
+  form.value.newPassword = password
+  form.value.confirmPassword = ''
+}
+
+// 处理密码验证变化
+const handleValidationChange = (result: PasswordValidationResult) => {
+  passwordValidation.value = result
 }
 
 // 提交表单
@@ -203,31 +210,6 @@ watch(dialogVisible, (visible) => {
 </script>
 
 <style scoped>
-.password-tips {
-  margin-top: 8px;
-  font-size: 12px;
-  color: #666;
-}
-
-.password-tips p {
-  margin: 0 0 4px 0;
-  font-weight: 500;
-}
-
-.password-tips ul {
-  margin: 0;
-  padding-left: 16px;
-}
-
-.password-tips li {
-  margin: 2px 0;
-  color: #999;
-}
-
-.password-tips li.valid {
-  color: #52c41a;
-}
-
 .dialog-footer {
   text-align: right;
 }

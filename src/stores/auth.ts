@@ -94,10 +94,8 @@ export const useAuthStore = defineStore('auth', () => {
       localStorage.removeItem('token')
     }
   }
-
   // 自动登出定时器
-  let autoLogoutTimer: NodeJS.Timeout | null = null
-
+  let autoLogoutTimer: number | null = null
   const resetAutoLogoutTimer = () => {
     if (autoLogoutTimer) {
       clearTimeout(autoLogoutTimer)
@@ -108,6 +106,109 @@ export const useAuthStore = defineStore('auth', () => {
         logoutUser()
       }, 30 * 60 * 1000) // 30分钟
     }
+  }
+
+  // 权限验证方法
+  const hasPermission = (permission: string | string[]): boolean => {
+    if (!userInfo.value || !userRole.value) {
+      return false
+    }
+
+    const permissions = Array.isArray(permission) ? permission : [permission]
+    const rolePermissions = getRolePermissions(userRole.value)
+    
+    return permissions.some(p => rolePermissions.includes(p))
+  }
+
+  const hasRole = (role: string | string[]): boolean => {
+    if (!userRole.value) {
+      return false
+    }
+
+    const roles = Array.isArray(role) ? role : [role]
+    return roles.includes(userRole.value)
+  }
+
+  // 获取角色权限
+  const getRolePermissions = (role: string): string[] => {
+    const rolePermissionMap: Record<string, string[]> = {
+      student: [
+        'STUDENT_VIEW_OWN',
+        'STUDENT_EDIT_OWN',
+        'PASSWORD_CHANGE'
+      ],
+      teacher: [
+        'STUDENT_VIEW_SUPERVISED',
+        'STUDENT_EDIT_SUPERVISED', 
+        'TEACHER_VIEW_OWN',
+        'TEACHER_EDIT_OWN',
+        'PASSWORD_CHANGE'
+      ],
+      college_admin: [
+        'STUDENT_VIEW',
+        'STUDENT_CREATE',
+        'STUDENT_EDIT',
+        'STUDENT_DELETE',
+        'STUDENT_IMPORT',
+        'STUDENT_EXPORT',
+        'TEACHER_VIEW',
+        'PASSWORD_CHANGE'
+      ],
+      college_leader: [
+        'STUDENT_VIEW',
+        'STUDENT_EDIT',
+        'STUDENT_APPROVE',
+        'TEACHER_VIEW',
+        'TEACHER_APPROVE',
+        'PASSWORD_CHANGE'
+      ],
+      grad_admin: [
+        'STUDENT_VIEW',
+        'STUDENT_CREATE',
+        'STUDENT_EDIT',
+        'STUDENT_DELETE',
+        'STUDENT_IMPORT',
+        'STUDENT_EXPORT',
+        'STUDENT_APPROVE',
+        'TEACHER_VIEW',
+        'TEACHER_CREATE',
+        'TEACHER_EDIT',
+        'TEACHER_DELETE',
+        'PASSWORD_CHANGE'
+      ],
+      grad_leader: [
+        'STUDENT_VIEW',
+        'STUDENT_APPROVE',
+        'TEACHER_VIEW',
+        'TEACHER_APPROVE',
+        'PASSWORD_CHANGE'
+      ],
+      school_leader: [
+        'STUDENT_VIEW',
+        'TEACHER_VIEW',
+        'REPORT_VIEW',
+        'PASSWORD_CHANGE'
+      ],
+      system_admin: [
+        'USER_CREATE',
+        'USER_EDIT',
+        'USER_DELETE',
+        'USER_VIEW',
+        'ROLE_MANAGE',
+        'SYSTEM_CONFIG',
+        'SYSTEM_BACKUP',
+        'PASSWORD_RESET',
+        'PASSWORD_CHANGE'
+      ],
+      audit_admin: [
+        'LOG_VIEW',
+        'LOG_EXPORT',
+        'AUDIT_REPORT',
+        'PASSWORD_CHANGE'
+      ]
+    }
+
+    return rolePermissionMap[role] || []
   }
 
   return {
@@ -126,6 +227,9 @@ export const useAuthStore = defineStore('auth', () => {
     handleLoginFail,
     resetLoginFail,
     setPasswordChanged,
-    resetAutoLogoutTimer
+    resetAutoLogoutTimer,
+    hasPermission,
+    hasRole,
+    getRolePermissions
   }
 })

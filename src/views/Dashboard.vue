@@ -31,14 +31,14 @@
           立即修改
         </el-button>
       </template>
-    </el-alert>
-
-    <!-- 统计卡片 -->
+    </el-alert>    <!-- 统计卡片 -->
     <div class="stats-section">
       <el-row :gutter="20">
-        <el-col :span="6" v-for="stat in statistics" :key="stat.title">
+        <el-col :xs="12" :sm="12" :md="6" :lg="6" v-for="stat in statistics" :key="stat.title">
           <el-card class="stat-card">
-            <div class="stat-content">
+            <div class="stat-content"
+              :class="{ 'stat-content-mobile': isMobile }"
+            >
               <div class="stat-icon" :style="{ backgroundColor: stat.color }">
                 <el-icon :size="24">
                   <component :is="stat.icon" />
@@ -59,9 +59,8 @@
       <el-card>
         <template #header>
           <h3>快捷操作</h3>
-        </template>
-        <el-row :gutter="20">
-          <el-col :span="6" v-for="action in quickActions" :key="action.title">
+        </template>        <el-row :gutter="20">
+          <el-col :xs="12" :sm="8" :md="6" :lg="6" v-for="action in quickActions" :key="action.title">
             <div 
               class="action-item" 
               @click="handleQuickAction(action.path)"
@@ -112,7 +111,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
@@ -121,6 +120,17 @@ import type { UserRole } from '@/types/auth'
 const router = useRouter()
 const authStore = useAuthStore()
 const showPasswordDialog = ref(false)
+const isMobile = ref(false)
+
+// 检查是否为移动设备
+const checkMobile = () => {
+  isMobile.value = window.innerWidth <= 768
+}
+
+// 监听窗口大小变化
+const handleResize = () => {
+  checkMobile()
+}
 
 // 统计数据
 const statistics = ref([
@@ -284,7 +294,13 @@ const loadStatistics = async () => {
 }
 
 onMounted(() => {
+  checkMobile()
+  window.addEventListener('resize', handleResize)
   loadStatistics()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
 })
 </script>
 
@@ -359,6 +375,12 @@ onMounted(() => {
   gap: 16px;
 }
 
+.stat-content-mobile {
+  flex-direction: column;
+  text-align: center;
+  gap: 8px;
+}
+
 .stat-icon {
   width: 60px;
   height: 60px;
@@ -369,6 +391,11 @@ onMounted(() => {
   color: white;
 }
 
+.stat-content-mobile .stat-icon {
+  width: 48px;
+  height: 48px;
+}
+
 .stat-info h3 {
   font-size: 32px;
   margin: 0 0 4px 0;
@@ -376,10 +403,18 @@ onMounted(() => {
   color: #1f2937;
 }
 
+.stat-content-mobile .stat-info h3 {
+  font-size: 24px;
+}
+
 .stat-info p {
   font-size: 14px;
   margin: 0;
   color: #6b7280;
+}
+
+.stat-content-mobile .stat-info p {
+  font-size: 12px;
 }
 
 .quick-actions {
@@ -437,10 +472,22 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .dashboard {
+    padding: 0 8px;
+  }
+  
   .welcome-content {
     flex-direction: column;
     text-align: center;
     gap: 16px;
+  }
+  
+  .welcome-text h2 {
+    font-size: 24px;
+  }
+  
+  .welcome-text p {
+    font-size: 14px;
   }
   
   .stats-section :deep(.el-col) {
@@ -448,6 +495,45 @@ onMounted(() => {
   }
   
   .quick-actions :deep(.el-col) {
+    margin-bottom: 16px;
+  }
+  
+  .action-item {
+    padding: 16px 12px;
+  }
+  
+  .action-item h4 {
+    font-size: 14px;
+  }
+  
+  .action-item p {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard {
+    padding: 0 4px;
+  }
+  
+  .welcome-card :deep(.el-card__body) {
+    padding: 16px;
+  }
+  
+  .welcome-text h2 {
+    font-size: 20px;
+  }
+  
+  .action-item {
+    padding: 12px 8px;
+  }
+  
+  .stats-section :deep(.el-row) {
+    margin: 0 -8px;
+  }
+  
+  .stats-section :deep(.el-col) {
+    padding: 0 8px;
     margin-bottom: 16px;
   }
 }

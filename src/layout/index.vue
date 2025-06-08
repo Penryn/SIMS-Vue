@@ -1,7 +1,7 @@
 <template>
   <el-container class="layout-container">
-    <!-- 侧边栏 -->
-    <el-aside :width="collapsed ? '64px' : '250px'" class="sidebar">
+    <!-- 桌面端侧边栏 -->
+    <el-aside :width="collapsed ? '64px' : '250px'" class="sidebar" v-show="!isMobile">
       <div class="logo">
         <img src="@/assets/logo.svg" alt="SIMS" v-if="!collapsed" />
         <span v-if="!collapsed" class="logo-text">学籍管理系统</span>
@@ -29,22 +29,60 @@
       </el-menu>
     </el-aside>
 
+    <!-- 移动端抽屉侧边栏 -->
+    <el-drawer
+      v-model="showMobileSidebar"
+      direction="ltr"
+      :with-header="false"
+      size="250px"
+      v-if="isMobile"
+    >
+      <div class="mobile-sidebar">
+        <div class="logo">
+          <img src="@/assets/logo.svg" alt="SIMS" />
+          <span class="logo-text">学籍管理系统</span>
+        </div>
+        
+        <el-menu
+          :default-active="activeMenu"
+          :unique-opened="true"
+          router
+          class="sidebar-menu"
+          @select="showMobileSidebar = false"
+        >
+          <template v-for="item in menuItems" :key="item.path">
+            <el-menu-item
+              v-if="hasPermission(item.roles)"
+              :index="item.path"
+              :route="item.path"
+            >
+              <el-icon>
+                <component :is="item.icon" />
+              </el-icon>
+              <template #title>{{ item.title }}</template>
+            </el-menu-item>
+          </template>
+        </el-menu>
+      </div>
+    </el-drawer>
+
     <el-container>
       <!-- 顶部导航 -->
       <el-header class="header">
         <div class="header-left">
           <el-button
             type="text"
-            @click="toggleCollapse"
+            @click="isMobile ? (showMobileSidebar = true) : toggleCollapse()"
             class="collapse-btn"
           >
             <el-icon>
-              <Fold v-if="!collapsed" />
+              <Menu v-if="isMobile" />
+              <Fold v-else-if="!collapsed" />
               <Expand v-else />
             </el-icon>
           </el-button>
           
-          <el-breadcrumb separator="/">
+          <el-breadcrumb separator="/" v-show="!isMobile">
             <el-breadcrumb-item>{{ currentPageTitle }}</el-breadcrumb-item>
           </el-breadcrumb>
         </div>
@@ -63,7 +101,7 @@
               class="warning-btn"
             >
               <el-icon><Warning /></el-icon>
-              密码即将过期
+              <span v-show="!isMobile">密码即将过期</span>
             </el-button>
           </el-badge>
 
@@ -73,8 +111,8 @@
               <el-avatar :src="authStore.userInfo?.avatar" class="avatar">
                 {{ authStore.userInfo?.name?.substring(0, 1) }}
               </el-avatar>
-              <span class="username">{{ authStore.userInfo?.name }}</span>
-              <span class="role-tag">{{ getRoleText(authStore.userRole) }}</span>
+              <span class="username" v-show="!isMobile">{{ authStore.userInfo?.name }}</span>
+              <span class="role-tag" v-show="!isMobile">{{ getRoleText(authStore.userRole) }}</span>
             </div>
             <template #dropdown>
               <el-dropdown-menu>
@@ -111,7 +149,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -124,6 +162,21 @@ const authStore = useAuthStore()
 
 const collapsed = ref(false)
 const showPasswordDialog = ref(false)
+const isMobile = ref(false)
+const showMobileSidebar = ref(false)
+
+// 检查是否为移动设备
+const checkMobile = () => {
+  isMobile.value = window.innerWidth <= 768
+  if (isMobile.value) {
+    collapsed.value = true
+  }
+}
+
+// 监听窗口大小变化
+const handleResize = () => {
+  checkMobile()
+}
 
 // 菜单项配置
 const menuItems = [
@@ -162,12 +215,17 @@ const menuItems = [
     title: '用户管理',
     icon: 'Setting',
     roles: ['system_admin']
-  },
-  {
+  },  {
     path: '/audit-logs',
     title: '审计日志',
     icon: 'Document',
     roles: ['audit_admin']
+  },
+  {
+    path: '/import-export',
+    title: '数据导入导出',
+    icon: 'Upload',
+    roles: ['college_admin', 'grad_admin', 'system_admin']
   }
 ]
 
@@ -239,10 +297,16 @@ const handleLogout = async () => {
 }
 
 onMounted(() => {
+  checkMobile()
+  window.addEventListener('resize', handleResize)
   // 检查是否需要强制修改密码
   if (authStore.forcePasswordChange) {
     showPasswordDialog.value = true
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
 })
 </script>
 
@@ -350,5 +414,77 @@ onMounted(() => {
 .main-content {
   background-color: #f5f5f5;
   padding: 24px;
+}
+
+.mobile-sidebar {
+  background-color: #001529;
+  height: 100%;
+}
+
+.mobile-sidebar .logo {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+  border-bottom: 1px solid #1f2937;
+}
+
+.mobile-sidebar .logo img {
+  width: 32px;
+  height: 32px;
+  margin-right: 8px;
+}
+
+.mobile-sidebar .sidebar-menu {
+  border-right: none;
+  background-color: #001529;
+}
+
+.mobile-sidebar .sidebar-menu :deep(.el-menu-item) {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.mobile-sidebar .sidebar-menu :deep(.el-menu-item:hover),
+.mobile-sidebar .sidebar-menu :deep(.el-menu-item.is-active) {
+  background-color: #1890ff;
+  color: white;
+}
+
+/* 响应式布局 */
+@media (max-width: 1024px) {
+  .header {
+    padding: 0 16px;
+  }
+  
+  .main-content {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    padding: 0 12px;
+  }
+  
+  .main-content {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    padding: 0 8px;
+  }
+  
+  .main-content {
+    padding: 8px;
+  }
+  
+  .collapse-btn {
+    margin-right: 8px;
+  }
 }
 </style>

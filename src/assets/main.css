@@ -1,9 +1,7 @@
 @import './base.css';
 
+/* 移除全局固定宽度和padding，让布局系统完全控制 */
 #app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
   font-weight: normal;
 }
 
@@ -21,15 +19,4 @@ a,
   }
 }
 
-@media (min-width: 1024px) {
-  body {
-    display: flex;
-    place-items: center;
-  }
-
-  #app {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 0 2rem;
-  }
-}
+/* 移除桌面端的grid布局，让组件自己控制布局 */
