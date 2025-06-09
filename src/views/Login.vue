@@ -5,19 +5,7 @@
         <div class="login-header">
           <img src="@/assets/logo.svg" alt="SIMS" class="logo" />
           <h1 class="title">学籍信息管理系统</h1>
-          <p class="subtitle">Student Information Management System</p>
-        </div>
-
-        <!-- 账户锁定提示 -->
-        <el-alert
-          v-if="authStore.isLocked"
-          title="账户已锁定"
-          type="error"
-          :description="`登录失败次数过多，账户已锁定，请在 ${lockTimeLeft} 后重试`"
-          show-icon
-          :closable="false"
-          class="lock-alert"
-        />
+          <p class="subtitle">Student Information Management System</p>        </div>
 
         <el-form
           ref="formRef"
@@ -25,13 +13,11 @@
           :rules="rules"
           class="login-form"
           @submit.prevent="handleLogin"
-        >
-          <el-form-item prop="username">
+        >          <el-form-item prop="username">
             <el-input
               v-model="loginForm.username"
               placeholder="请输入学号"
               size="large"
-              :disabled="authStore.isLocked"
               autocomplete="username"
             >
               <template #prefix>
@@ -47,7 +33,6 @@
               placeholder="请输入密码"
               size="large"
               show-password
-              :disabled="authStore.isLocked"
               autocomplete="current-password"
               @keyup.enter="handleLogin"
             >
@@ -62,22 +47,16 @@
               type="primary"
               size="large"
               :loading="loading"
-              :disabled="authStore.isLocked"
               @click="handleLogin"
               class="login-btn"
             >
               登录
             </el-button>
           </el-form-item>
-        </el-form>
-
-        <div class="login-footer">
+        </el-form>        <div class="login-footer">
           <div class="tips">
             <el-icon><Warning /></el-icon>
             <span>首次登录密码为身份证号后8位，登录后请及时修改密码</span>
-          </div>
-          <div class="fail-count" v-if="authStore.loginFailCount > 0">
-            <span>登录失败 {{ authStore.loginFailCount }} 次，还有 {{ 5 - authStore.loginFailCount }} 次机会</span>
           </div>
         </div>
       </div>
@@ -93,7 +72,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
@@ -103,7 +82,6 @@ const router = useRouter()
 const authStore = useAuthStore()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
-let lockTimer: NodeJS.Timeout | null = null
 
 const loginForm = ref<LoginForm>({
   username: '',
@@ -122,17 +100,9 @@ const rules = {
   ]
 }
 
-// 锁定时间倒计时
-const lockTimeLeft = computed(() => {
-  if (!authStore.isLocked) return ''
-  
-  const timeLeft = Math.ceil((authStore.lockoutTime - Date.now()) / 1000 / 60)
-  return `${timeLeft}分钟`
-})
-
 // 处理登录
 const handleLogin = async () => {
-  if (!formRef.value || authStore.isLocked) return
+  if (!formRef.value) return
   
   try {
     await formRef.value.validate()
@@ -146,25 +116,8 @@ const handleLogin = async () => {
     ElMessage.error(error.message || '登录失败')
     
     // 清空密码
-    loginForm.value.password = ''
-  } finally {
+    loginForm.value.password = ''  } finally {
     loading.value = false
-  }
-}
-
-// 启动锁定倒计时
-const startLockTimer = () => {
-  if (lockTimer) {
-    clearInterval(lockTimer)
-  }
-  
-  if (authStore.isLocked) {
-    lockTimer = setInterval(() => {
-      if (!authStore.isLocked) {
-        clearInterval(lockTimer!)
-        lockTimer = null
-      }
-    }, 1000)
   }
 }
 
@@ -173,15 +126,6 @@ onMounted(() => {
   if (authStore.isAuthenticated) {
     router.push('/')
     return
-  }
-  
-  // 启动锁定倒计时
-  startLockTimer()
-})
-
-onUnmounted(() => {
-  if (lockTimer) {
-    clearInterval(lockTimer)
   }
 })
 </script>

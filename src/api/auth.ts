@@ -13,7 +13,7 @@ export const login = (data: LoginForm) => {
 // 获取用户信息
 export const getUserInfo = () => {
   return request({
-    url: '/auth/user-info',
+    url: '/users/current',
     method: 'get'
   })
 }
