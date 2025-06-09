@@ -16,7 +16,7 @@
         >          <el-form-item prop="username">
             <el-input
               v-model="loginForm.username"
-              placeholder="请输入学号"
+              placeholder="请输入用户名/学号"
               size="large"
               autocomplete="username"
             >
@@ -56,7 +56,7 @@
         </el-form>        <div class="login-footer">
           <div class="tips">
             <el-icon><Warning /></el-icon>
-            <span>首次登录密码为身份证号后8位，登录后请及时修改密码</span>
+            <span>学生首次登录密码为身份证号后8位，管理员默认密码为Admin@123456，登录后请及时修改密码</span>
           </div>
         </div>
       </div>
@@ -91,8 +91,8 @@ const loginForm = ref<LoginForm>({
 // 表单验证规则
 const rules = {
   username: [
-    { required: true, message: '请输入学号', trigger: 'blur' },
-    { min: 8, max: 20, message: '学号长度在8到20个字符', trigger: 'blur' }
+    { required: true, message: '请输入用户名/学号', trigger: 'blur' },
+    { min: 3, max: 20, message: '用户名/学号长度在3到20个字符', trigger: 'blur' }
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
@@ -111,12 +111,23 @@ const handleLogin = async () => {
     await authStore.loginUser(loginForm.value)
     
     ElMessage.success('登录成功')
-    router.push('/')
+    
+    // 获取重定向路径
+    const redirect = router.currentRoute.value.query.redirect as string
+    router.push(redirect || '/')
   } catch (error: any) {
-    ElMessage.error(error.message || '登录失败')
+    // 处理不同的错误情况
+    if (error.response?.status === 401) {
+      ElMessage.error('用户名或密码错误')
+    } else if (error.response?.status === 423) {
+      ElMessage.error('账号已被锁定，请联系管理员')
+    } else {
+      ElMessage.error(error.message || '登录失败')
+    }
     
     // 清空密码
-    loginForm.value.password = ''  } finally {
+    loginForm.value.password = ''
+  } finally {
     loading.value = false
   }
 }

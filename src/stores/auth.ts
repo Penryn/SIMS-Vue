@@ -24,20 +24,33 @@ export const useAuthStore = defineStore('auth', () => {
   const setUserInfo = (info: UserInfo) => {
     userInfo.value = info
   }
-
   const setPasswordChanged = () => {
     lastPasswordChangeTime.value = Date.now()
     forcePasswordChange.value = false
     localStorage.setItem('lastPasswordChangeTime', lastPasswordChangeTime.value.toString())
-  }
+  };  // 添加分号
+  
   const loginUser = async (loginForm: LoginForm) => {
     try {
       const response = await login(loginForm)
+      
+      // 根据后端返回的数据结构进行调整
+      // 假设后端返回的结构是 { token, id, username, name, firstLogin }
       setToken(response.data.token)
-      setUserInfo(response.data.userInfo)
+      
+      // 构造 UserInfo 对象
+      const userInfo: UserInfo = {
+        id: response.data.id,
+        username: response.data.username,
+        name: response.data.name,
+        role: mapRoleFromBackend(response.data.roles),
+        isFirstLogin: response.data.firstLogin
+      }
+      
+      setUserInfo(userInfo)
       
       // 检查是否是首次登录
-      if (response.data.userInfo.isFirstLogin) {
+      if (response.data.firstLogin) {
         forcePasswordChange.value = true
       }
       
@@ -46,11 +59,62 @@ export const useAuthStore = defineStore('auth', () => {
       throw error
     }
   }
-
+  
+  // 将后端角色映射到前端角色
+  const mapRoleFromBackend = (roles: string[]): UserRole => {
+    if (!roles || !roles.length) return 'student'
+    
+    // 将 ROLE_XXX 格式的角色转换为前端使用的格式
+    const roleMap: Record<string, UserRole> = {
+      'ROLE_STUDENT': 'student',
+      'ROLE_TEACHER': 'teacher',
+      'ROLE_COLLEGE_SECRETARY': 'college_admin',
+      'ROLE_COLLEGE_ADMIN': 'college_admin',
+      'ROLE_COLLEGE_LEADER': 'college_leader',
+      'ROLE_GRADUATE_ADMIN': 'grad_admin',
+      'ROLE_GRADUATE_LEADER': 'grad_leader',
+      'ROLE_SCHOOL_LEADER': 'school_leader',
+      'ROLE_SYSTEM_ADMIN': 'system_admin',
+      'ROLE_AUDIT_ADMIN': 'audit_admin'
+    }
+    
+    // 找到最高权限的角色
+    for (const role of roles) {
+      if (role in roleMap) {
+        return roleMap[role]
+      }
+    }
+    
+    return 'student'
+  }
   const fetchUserInfo = async () => {
     try {
       const response = await getUserInfo()
-      setUserInfo(response.data)
+      
+      // 检查响应格式
+      let userData = response.data;
+      
+      // 如果返回的是 { code, data, message } 格式
+      if (response.code !== undefined && response.data !== undefined) {
+        userData = response.data;
+      }
+      
+      // 构造 UserInfo 对象
+      const userInfo: UserInfo = {
+        id: userData.id,
+        username: userData.username,
+        name: userData.name,
+        role: mapRoleFromBackend(userData.roles || []),
+        isFirstLogin: userData.firstLogin
+      };
+      
+      // 如果有学院信息，添加进去
+      if (userData.collegeId) {
+        userInfo.collegeId = userData.collegeId;
+        userInfo.collegeName = userData.collegeName;
+      }
+      
+      setUserInfo(userInfo);
     } catch (error) {
       await logoutUser()
       throw error

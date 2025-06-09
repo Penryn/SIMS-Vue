@@ -5,7 +5,7 @@ import router from '@/router'
 
 // 创建axios实例
 const service = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/sims/api',
   timeout: 10000
 })
 
@@ -32,8 +32,12 @@ service.interceptors.response.use(
   (response) => {
     const res = response.data
     
-    // 如果返回码不是200，显示错误信息
-    if (res.code !== 200) {
+    // 处理不同的API返回格式
+    // 有些后端API可能返回 { code, data, message } 格式
+    // 有些可能直接返回数据
+    
+    // 如果有返回码并且不是200，显示错误信息
+    if (res.code !== undefined && res.code !== 200) {
       // 对于登录接口，不在这里显示错误消息，让登录页面处理
       if (!response.config?.url?.includes('/auth/login')) {
         ElMessage.error(res.message || '请求失败')
@@ -42,7 +46,7 @@ service.interceptors.response.use(
     }
     
     return res
-  },  (error) => {
+  },(error) => {
     const authStore = useAuthStore()
     
     if (error.response?.status === 401) {
