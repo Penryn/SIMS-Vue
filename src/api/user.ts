@@ -53,9 +53,9 @@ export const toggleUserStatus = (id: number, enabled: boolean) => {
 }
 
 // 修改密码
-export const changePassword = (data: { oldPassword: string; newPassword: string }) => {
+export const changePassword = (data: { oldPassword: string; newPassword: string;confirmPassword:string }) => {
   return request({
-    url: '/user/change-password',
+    url: '/auth/change-password',
     method: 'post',
     data
   })

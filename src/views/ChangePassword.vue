@@ -19,7 +19,6 @@
           <li>密码长度至少8位，最多20位</li>
           <li>必须包含大写字母、小写字母、数字和特殊字符</li>
           <li>不能包含用户名、姓名等个人信息</li>
-          <li>不能与近6次历史密码相同</li>
           <li>建议每90天更换一次密码</li>
         </ul>
       </el-alert>
@@ -58,10 +57,22 @@
                 :class="strengthClass"
                 :style="{ width: strengthPercentage + '%' }"
               ></div>
+              <div class="strength-labels">
+                <span :class="{ active: passwordStrength >= 1 }">弱</span>
+                <span :class="{ active: passwordStrength >= 3 }">中</span>
+                <span :class="{ active: passwordStrength >= 5 }">强</span>
+              </div>
             </div>
             <span class="strength-text" :class="strengthClass">
               {{ strengthText }}
             </span>
+            <ul class="strength-tips">
+              <li :class="{ pass: /[A-Z]/.test(passwordForm.newPassword) }">包含大写字母</li>
+              <li :class="{ pass: /[a-z]/.test(passwordForm.newPassword) }">包含小写字母</li>
+              <li :class="{ pass: /\d/.test(passwordForm.newPassword) }">包含数字</li>
+              <li :class="{ pass: hasSpecialChar }">包含特殊字符</li>
+              <li :class="{ pass: passwordForm.newPassword.length >= 8 }">长度不少于8位</li>
+            </ul>
           </div>
         </el-form-item>
 
@@ -72,15 +83,6 @@
             placeholder="请再次输入新密码"
             show-password
             :prefix-icon="Lock"
-          />
-        </el-form-item>
-
-        <!-- 密码历史检查结果 -->
-        <el-form-item v-if="historyCheckResult">
-          <el-alert
-            :title="historyCheckResult.message"
-            :type="historyCheckResult.type"
-            :closable="false"
           />
         </el-form-item>
 
@@ -98,27 +100,6 @@
           </el-button>
         </el-form-item>
       </el-form>
-
-      <!-- 密码修改记录 -->
-      <div class="password-history" v-if="showHistory">
-        <h3>密码修改记录</h3>
-        <el-table :data="passwordHistory" stripe>
-          <el-table-column prop="changeTime" label="修改时间" width="180">
-            <template #default="{ row }">
-              {{ formatDateTime(row.changeTime) }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="ipAddress" label="IP地址" width="150" />
-          <el-table-column prop="userAgent" label="设备信息" show-overflow-tooltip />
-          <el-table-column prop="status" label="状态" width="100">
-            <template #default="{ row }">
-              <el-tag :type="row.status === 'SUCCESS' ? 'success' : 'danger'">
-                {{ row.status === 'SUCCESS' ? '成功' : '失败' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-        </el-table>
-      </div>
     </el-card>
   </div>
 </template>
@@ -128,7 +109,7 @@ import { ref, reactive, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Lock } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
-import { changePassword, getPasswordHistory, checkPasswordHistory } from '@/api/user'
+import { changePassword } from '@/api/user'
 import type { FormInstance, FormRules } from 'element-plus'
 
 const authStore = useAuthStore()
@@ -148,18 +129,6 @@ const strengthText = ref('')
 const strengthClass = ref('')
 const strengthPercentage = ref(0)
 
-// 历史密码检查结果
-const historyCheckResult = ref<{
-  message: string
-  type: 'success' | 'warning' | 'error'
-} | null>(null)
-
-// 密码修改记录
-const passwordHistory = ref([])
-const showHistory = computed(() => {
-  return ['system_admin', 'audit_admin'].includes(authStore.userRole)
-})
-
 // 表单验证规则
 const passwordRules: FormRules = {
   oldPassword: [
@@ -172,7 +141,17 @@ const passwordRules: FormRules = {
   ],
   confirmPassword: [
     { required: true, message: '请确认新密码', trigger: 'blur' },
-    { validator: validatePasswordConfirm, trigger: 'blur' }
+    { validator: validatePasswordConfirm, trigger: 'blur' },
+    {
+      validator: (rule: any, value: string, callback: any) => {
+        if (!value) {
+          callback(new Error('请确认新密码'));
+        } else {
+          callback();
+        }
+      },
+      trigger: 'blur'
+    }
   ]
 }
 
@@ -237,23 +216,18 @@ const checkPasswordStrength = () => {
   }
 
   let score = 0
-  
   // 长度评分
   if (password.length >= 8) score += 1
   if (password.length >= 12) score += 1
-  
   // 字符类型评分
   if (/[a-z]/.test(password)) score += 1
   if (/[A-Z]/.test(password)) score += 1
   if (/\d/.test(password)) score += 1
   if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) score += 1
-  
   // 复杂度评分
   if (password.length >= 16) score += 1
   if (/(.)\1{2,}/.test(password)) score -= 1 // 重复字符扣分
-  
   passwordStrength.value = Math.max(0, Math.min(6, score))
-  
   if (score <= 2) {
     strengthText.value = '弱'
     strengthClass.value = 'weak'
@@ -267,60 +241,21 @@ const checkPasswordStrength = () => {
     strengthClass.value = 'strong'
     strengthPercentage.value = 100
   }
-
-  // 检查历史密码
-  checkPasswordHistoryAsync()
-}
-
-// 异步检查历史密码
-const checkPasswordHistoryAsync = async () => {
-  try {
-    const response = await checkPasswordHistory({
-      userId: authStore.userInfo?.id,
-      newPassword: passwordForm.newPassword
-    })
-    
-    if (response.data.success) {
-      if (response.data.data.isRepeated) {
-        historyCheckResult.value = {
-          message: '新密码不能与近6次历史密码相同',
-          type: 'error'
-        }
-      } else {
-        historyCheckResult.value = {
-          message: '密码可以使用',
-          type: 'success'
-        }
-      }
-    }
-  } catch (error) {
-    console.error('检查历史密码失败:', error)
-  }
 }
 
 // 提交表单
 const handleSubmit = async () => {
   if (!passwordFormRef.value) return
-
   try {
     await passwordFormRef.value.validate()
-    
-    if (historyCheckResult.value?.type === 'error') {
-      ElMessage.error('请修改密码，不能与历史密码相同')
-      return
-    }
-
     loading.value = true
-
     const response = await changePassword({
       oldPassword: passwordForm.oldPassword,
-      newPassword: passwordForm.newPassword
+      newPassword: passwordForm.newPassword,
+      confirmPassword: passwordForm.confirmPassword
     })
-
-    if (response.data.success) {
-      ElMessage.success('密码修改成功，请重新登录')
-      
-      // 显示确认对话框
+    if ((response.data && response.data.success) || response.success) {
+      ElMessage.success((response.data && response.data.message) || response.message || '密码修改成功，请重新登录')
       await ElMessageBox.confirm(
         '密码修改成功，系统将自动退出登录，请使用新密码重新登录。',
         '修改成功',
@@ -330,11 +265,9 @@ const handleSubmit = async () => {
           showCancelButton: false
         }
       )
-      
-      // 退出登录
-      authStore.logout()
+      await authStore.logout()
     } else {
-      ElMessage.error(response.data.message || '密码修改失败')
+      ElMessage.error((response.data && response.data.message) || response.message || '密码修改失败')
     }
   } catch (error: any) {
     console.error('修改密码失败:', error)
@@ -351,7 +284,6 @@ const handleReset = () => {
   strengthText.value = ''
   strengthClass.value = ''
   strengthPercentage.value = 0
-  historyCheckResult.value = null
 }
 
 // 格式化日期时间
@@ -359,132 +291,108 @@ const formatDateTime = (date: string) => {
   return new Date(date).toLocaleString('zh-CN')
 }
 
-// 加载密码修改记录
-const loadPasswordHistory = async () => {
-  if (!showHistory.value) return
-  
-  try {
-    const response = await getPasswordHistory()
-    if (response.data.success) {
-      passwordHistory.value = response.data.data
-    }
-  } catch (error) {
-    console.error('加载密码修改记录失败:', error)
-  }
-}
-
-// 组件挂载时加载历史记录
-import { onMounted } from 'vue'
-onMounted(() => {
-  loadPasswordHistory()
-})
+// 计算属性：是否包含特殊字符
+const hasSpecialChar = computed(() =>
+  /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(passwordForm.newPassword)
+)
 </script>
 
 <style scoped>
 .change-password {
-  max-width: 600px;
-  margin: 0 auto;
   padding: 20px;
 }
 
 .password-card {
-  border-radius: 8px;
+  max-width: 600px;
+  margin: 0 auto;
 }
 
-.card-header h2 {
-  margin: 0 0 8px 0;
-  color: #303133;
-}
-
-.card-header p {
-  margin: 0;
-  color: #606266;
-  font-size: 14px;
+.card-header {
+  text-align: center;
 }
 
 .security-tips {
-  margin-bottom: 24px;
-}
-
-.security-tips ul {
-  margin: 0;
-  padding-left: 20px;
-}
-
-.security-tips li {
-  margin: 4px 0;
-  font-size: 14px;
+  margin-bottom: 20px;
 }
 
 .password-form {
-  margin-top: 24px;
+  margin-top: 20px;
 }
 
 .password-strength {
-  margin-top: 8px;
+  margin-top: 10px;
 }
-
 .strength-bar {
   width: 100%;
-  height: 4px;
-  background-color: #f5f5f5;
-  border-radius: 2px;
+  height: 10px;
+  background-color: #e0e0e0;
+  border-radius: 4px;
   overflow: hidden;
-  margin-bottom: 4px;
+  position: relative;
 }
-
 .strength-fill {
   height: 100%;
-  transition: all 0.3s ease;
-  border-radius: 2px;
+  transition: width 0.3s;
 }
-
 .strength-fill.weak {
-  background-color: #f56c6c;
+  background: linear-gradient(90deg, #f56c6c 0%, #fbc2c2 100%);
 }
-
 .strength-fill.medium {
-  background-color: #e6a23c;
+  background: linear-gradient(90deg, #e6a23c 0%, #ffe0b2 100%);
 }
-
 .strength-fill.strong {
-  background-color: #67c23a;
+  background: linear-gradient(90deg, #67c23a 0%, #b2f2bb 100%);
 }
-
-.strength-text {
+.strength-labels {
+  position: absolute;
+  top: 12px;
+  left: 0;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
   font-size: 12px;
-  font-weight: 500;
+  color: #bdbdbd;
+  padding: 0 2px;
 }
-
+.strength-labels span.active {
+  color: #303133;
+  font-weight: bold;
+}
+.strength-text {
+  margin-top: 5px;
+  font-weight: bold;
+  display: inline-block;
+}
 .strength-text.weak {
   color: #f56c6c;
 }
-
 .strength-text.medium {
   color: #e6a23c;
 }
-
 .strength-text.strong {
   color: #67c23a;
 }
+.strength-tips {
+  margin: 8px 0 0 0;
+  padding: 0 0 0 18px;
+  font-size: 12px;
+  color: #909399;
+  list-style: disc;
+}
+.strength-tips li {
+  margin-bottom: 2px;
+  transition: color 0.2s;
+}
+.strength-tips li.pass {
+  color: #67c23a;
+  font-weight: bold;
+}
 
 .password-history {
-  margin-top: 32px;
-  padding-top: 24px;
-  border-top: 1px solid #ebeef5;
+  margin-top: 30px;
 }
 
 .password-history h3 {
-  margin: 0 0 16px 0;
-  color: #303133;
-  font-size: 16px;
-}
-
-.password-form :deep(.el-form-item__label) {
-  font-weight: 500;
-}
-
-.password-form :deep(.el-input__wrapper) {
-  border-radius: 6px;
+  margin-bottom: 10px;
 }
 </style>

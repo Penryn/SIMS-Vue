@@ -114,17 +114,29 @@ const handleLogin = async () => {
     
     // 获取重定向路径
     const redirect = router.currentRoute.value.query.redirect as string
-    router.push(redirect || '/')
+    await router.push(redirect || '/')
   } catch (error: any) {
     // 处理不同的错误情况
-    if (error.response?.status === 401) {
-      ElMessage.error('用户名或密码错误')
-    } else if (error.response?.status === 423) {
-      ElMessage.error('账号已被锁定，请联系管理员')
+    let msg = ''
+    if (error?.message && typeof error.message === 'string' && error.message.includes('Bad credentials')) {
+      msg = '用户名或密码错误'
+    } else if (error?.response?.status === 401) {
+      msg = '用户名或密码错误'
+    } else if (error?.response?.status === 423) {
+      msg = '账号已被锁定，请联系管理员'
+    } else if (typeof error === 'string') {
+      msg = error
+    } else if (error?.message) {
+      msg = error.message
     } else {
-      ElMessage.error(error.message || '登录失败')
+      msg = '登录失败'
     }
-    
+    // 只弹一次错误提示
+    if (msg && !msg.includes('token')) {
+      ElMessage.error(msg)
+    } else if (msg && msg.includes('token')) {
+      ElMessage.error('用户名或密码错误')
+    }
     // 清空密码
     loginForm.value.password = ''
   } finally {

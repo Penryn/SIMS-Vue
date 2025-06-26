@@ -1,13 +1,16 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { LoginForm, UserInfo } from '@/types/auth'
+import type {LoginForm, UserInfo, UserRole} from '@/types/auth'
 import { login, getUserInfo, logout } from '@/api/auth'
+import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string>(localStorage.getItem('token') || '')
   const userInfo = ref<UserInfo | null>(null)
   const lastPasswordChangeTime = ref<number>(parseInt(localStorage.getItem('lastPasswordChangeTime') || '0'))
   const forcePasswordChange = ref<boolean>(false)
+  const router = useRouter()
 
   const isAuthenticated = computed(() => !!token.value && !!userInfo.value)
   const userRole = computed(() => userInfo.value?.role || '')
@@ -56,6 +59,14 @@ export const useAuthStore = defineStore('auth', () => {
       
       return response
     } catch (error) {
+      // 登录失败时清理本地状态，防止异常访问
+      token.value = ''
+      userInfo.value = null
+      localStorage.removeItem('token')
+      localStorage.removeItem('lastPasswordChangeTime')
+      localStorage.removeItem('forcePasswordChange')
+      lastPasswordChangeTime.value = 0
+      forcePasswordChange.value = false
       throw error
     }
   }
@@ -124,16 +135,26 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       // 只有在已登录状态下才调用登出接口
       if (token.value) {
-        await logout()
+        const response = await logout()
+        if (!response.success) {
+          ElMessage.warning(response.message || '登出失败')
+          console.warn('登出失败：', response.message || '未知错误')
+        }
       }
     } catch (error) {
-      // 登出接口失败不影响本地清理
+      ElMessage.error('登出请求异常')
       console.warn('Logout request failed:', error)
     } finally {
       // 无论如何都要清理本地状态
       token.value = ''
       userInfo.value = null
       localStorage.removeItem('token')
+      localStorage.removeItem('lastPasswordChangeTime')
+      localStorage.removeItem('forcePasswordChange')
+      lastPasswordChangeTime.value = 0
+      forcePasswordChange.value = false
+      // 跳转到登录页
+      router.push({ name: 'Login' })
     }
   }
   // 自动登出定时器
@@ -261,7 +282,7 @@ export const useAuthStore = defineStore('auth', () => {
     forcePasswordChange,
     loginUser,
     fetchUserInfo,
-    logoutUser,
+    logout: logoutUser,
     setPasswordChanged,
     resetAutoLogoutTimer,
     hasPermission,
